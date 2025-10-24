@@ -1,0 +1,6 @@
+{
+  "ADMIN_IDS": [123456789],
+  "SEND_HOUR": 10,
+  "SEND_MINUTE": 45,
+  "BOT_ENABLED": true
+}
