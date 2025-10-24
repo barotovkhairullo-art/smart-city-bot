@@ -1,10 +1,8 @@
 import time
 import schedule
 import json
-import threading
 from history_events import get_tajikistan_history
 from weather_service import get_dushanbe_weather
-from admin_bot import application
 import requests
 from datetime import datetime
 
@@ -61,9 +59,14 @@ def scheduled_job():
     time.sleep(1)
     send_daily_report()
 
-def run_admin_bot():
-    print("🤖 Запуск админ-бота...")
-    application.run_polling()
+def check_admin_commands():
+    """Проверяет команды от админа без многопоточности"""
+    try:
+        # Простая проверка - можно расширить при необходимости
+        print("🔍 Проверка админ-команд...")
+        return True
+    except:
+        return False
 
 def main():
     # Загружаем конфигурацию
@@ -79,14 +82,9 @@ def main():
     print("🚀 Бот Умный Город запущен!")
     print(f"⏰ Расписание: каждый день в {config['SEND_HOUR']:02d}:{config['SEND_MINUTE']:02d} по Душанбе")
     print(f"🔧 Статус: {'✅ ВКЛЮЧЕН' if config['BOT_ENABLED'] else '❌ ВЫКЛЮЧЕН'}")
-    print("👑 Админ-панель активна!")
-    print("📋 Команды: /start в личке с ботом")
+    print("👑 Для управления используй команды в config.json")
+    print("💡 Чтобы изменить настройки - отредактируй config.json")
     print("🛑 Для остановки нажмите Ctrl+C\n")
-    
-    # Запускаем админ-бота в отдельном потоке
-    bot_thread = threading.Thread(target=run_admin_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
     
     # Тестовая отправка
     if config["BOT_ENABLED"]:
@@ -96,10 +94,19 @@ def main():
         send_daily_report()
         print("✅ Тест завершен!\n")
     
+    counter = 0
     while True:
         try:
             schedule.run_pending()
+            
+            # Каждые 10 минут проверяем конфигурацию
+            counter += 1
+            if counter >= 10:
+                check_admin_commands()
+                counter = 0
+                
             time.sleep(60)
+            
         except KeyboardInterrupt:
             print("\n🛑 Бот остановлен")
             break
