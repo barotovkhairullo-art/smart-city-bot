@@ -5,8 +5,8 @@ from weather_service import get_dushanbe_weather
 from telegram_bot import send_sticker, send_daily_report
 
 # НАСТРОЙКА ВРЕМЕНИ ОТПРАВКИ
-SEND_HOUR = 10    # ← СТАВЬ ЧАСЫ КАК ХОЧЕШЬ (10)
-SEND_MINUTE = 58  # ← СТАВЬ МИНУТЫ КАК ХОЧЕШЬ (45)
+SEND_HOUR = 11    # ← СТАВЬ ЧАСЫ КАК ХОЧЕШЬ (10)
+SEND_MINUTE = 02  # ← СТАВЬ МИНУТЫ КАК ХОЧЕШЬ (45)
 
 # АВТОМАТИЧЕСКИ ПЕРЕВОДИМ ВРЕМЯ ДУШАНБЕ → UTC
 SEND_HOUR = SEND_HOUR - 5  # Душанбе UTC+5
@@ -65,4 +65,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
