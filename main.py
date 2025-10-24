@@ -1,65 +1,26 @@
 import time
 import schedule
-from datetime import datetime
 from history_events import get_tajikistan_history
 from weather_service import get_dushanbe_weather
-
-# ТВОИ ДАННЫЕ
-TELEGRAM_BOT_TOKEN = "8249137825:AAHChjPuHOdL7Y5su0gYpQnwtDZ4ubfXsl0"
-CHANNEL_ID = "-1003104338746"
-STICKER_ID = "CAACAgIAAxkBAAEPnw5o-adhPImHgSmQpfa-yO9kVk1RxAACwwwAAsVEyEtvpOuf2LbHBDYE"
+from telegram_bot import send_sticker, send_daily_report
 
 # НАСТРОЙКА ВРЕМЕНИ ОТПРАВКИ
 SEND_HOUR = 17    # ← ИЗМЕНИ ЧАСЫ (0-23)
 SEND_MINUTE = 0   # ← ИЗМЕНИ МИНУТЫ (0-59)
 
-def send_sticker():
-    """Отправляет стикер"""
-    try:
-        import requests
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendSticker"
-        data = {"chat_id": CHANNEL_ID, "sticker": STICKER_ID}
-        requests.post(url, data=data)
-        print("✅ Стикер отправлен!")
-    except:
-        print("❌ Ошибка стикера")
-
-def send_daily_report():
-    """Отправляет сообщение"""
-    try:
-        import requests
-        today = datetime.now().strftime("%d.%m.%Y")
-        
-        # Получаем данные из отдельных файлов
-        history_text = get_tajikistan_history()
-        weather_text = get_dushanbe_weather()
-        
-        message = f"📅 ЕЖЕДНЕВНАЯ СВОДКА НА {today}\n\n"
-        message += history_text + "\n"
-        message += weather_text + "\n\n"
-        message += "📖 Государственное унитарное предприятие «Умный город»"
-        
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        data = {"chat_id": CHANNEL_ID, "text": message}
-        
-        response = requests.post(url, data=data)
-        
-        if response.status_code == 200:
-            print(f"✅ Сообщение отправлено! Время: {datetime.now().strftime('%H:%M:%S')}")
-            return True
-        else:
-            print(f"❌ Ошибка: {response.text}")
-            return False
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        return False
-
 def scheduled_job():
     """Запланированная отправка"""
+    from datetime import datetime
     print(f"\n🔄 Автоматическая отправка в {datetime.now().strftime('%H:%M:%S')}")
+    
+    # Получаем данные из отдельных модулей
+    history_text = get_tajikistan_history()
+    weather_text = get_dushanbe_weather()
+    
+    # Отправляем сообщение
     send_sticker()
     time.sleep(1)
-    send_daily_report()
+    send_daily_report(history_text, weather_text)
 
 def main():
     # Настраиваем расписание
@@ -71,14 +32,17 @@ def main():
     print("📁 Файлы разделены:")
     print("   - history_events.py - исторические события")
     print("   - weather_service.py - погода")
+    print("   - telegram_bot.py - отправка в Telegram")
     print("   - main.py - главный файл")
     print("🛑 Для остановки нажмите Ctrl+C\n")
     
     # Тестовая отправка
     print("🔄 Тестовая отправка...")
+    history_text = get_tajikistan_history()
+    weather_text = get_dushanbe_weather()
     send_sticker()
     time.sleep(1)
-    send_daily_report()
+    send_daily_report(history_text, weather_text)
     print("✅ Тест завершен!\n")
     
     while True:
