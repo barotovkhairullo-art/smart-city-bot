@@ -5,8 +5,13 @@ from weather_service import get_dushanbe_weather
 from telegram_bot import send_sticker, send_daily_report
 
 # НАСТРОЙКА ВРЕМЕНИ ОТПРАВКИ
-SEND_HOUR = 10    # ← ИЗМЕНИ ЧАСЫ (0-23)
-SEND_MINUTE = 45   # ← ИЗМЕНИ МИНУТЫ (0-59)
+SEND_HOUR = 10    # ← СТАВЬ ЧАСЫ КАК ХОЧЕШЬ (10)
+SEND_MINUTE = 45  # ← СТАВЬ МИНУТЫ КАК ХОЧЕШЬ (45)
+
+# АВТОМАТИЧЕСКИ ПЕРЕВОДИМ ВРЕМЯ ДУШАНБЕ → UTC
+SEND_HOUR = SEND_HOUR - 5  # Душанбе UTC+5
+if SEND_HOUR < 0:
+    SEND_HOUR = SEND_HOUR + 24
 
 def scheduled_job():
     """Запланированная отправка"""
@@ -27,7 +32,8 @@ def main():
     schedule.every().day.at(f"{SEND_HOUR:02d}:{SEND_MINUTE:02d}").do(scheduled_job)
     
     print("🚀 Бот Умный Город запущен!")
-    print(f"⏰ Расписание: каждый день в {SEND_HOUR:02d}:{SEND_MINUTE:02d}")
+    print(f"⏰ Расписание: каждый день в 10:45 по Душанбе")
+    print(f"📍 Серверное время: {SEND_HOUR:02d}:{SEND_MINUTE:02d} UTC")
     print("📍 Группа: -1003104338746")
     print("📁 Файлы разделены:")
     print("   - history_events.py - исторические события")
@@ -58,5 +64,4 @@ def main():
             time.sleep(60)
 
 if __name__ == "__main__":
-
     main()
