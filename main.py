@@ -5,8 +5,8 @@ from weather_service import get_dushanbe_weather
 from telegram_bot import send_sticker, send_daily_report
 
 # НАСТРОЙКА ВРЕМЕНИ ОТПРАВКИ
-SEND_HOUR = 17    # ← ИЗМЕНИ ЧАСЫ (0-23)
-SEND_MINUTE = 0   # ← ИЗМЕНИ МИНУТЫ (0-59)
+SEND_HOUR = 10    # ← ИЗМЕНИ ЧАСЫ (0-23)
+SEND_MINUTE = 45   # ← ИЗМЕНИ МИНУТЫ (0-59)
 
 def scheduled_job():
     """Запланированная отправка"""
@@ -58,4 +58,5 @@ def main():
             time.sleep(60)
 
 if __name__ == "__main__":
+
     main()
