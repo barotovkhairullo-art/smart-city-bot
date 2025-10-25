@@ -1,5 +1,4 @@
 import time
-import schedule
 import json
 import requests
 from datetime import datetime
@@ -51,6 +50,23 @@ def send_daily_report(group_id):
         print(f"❌ Ошибка формирования отчета: {e}")
         return False
 
+def should_send_now():
+    """Проверяет, нужно ли отправлять сообщение сейчас"""
+    config = load_config()
+    if not config["BOT_ENABLED"]:
+        return False
+        
+    current_time = datetime.now()
+    dushanbe_hour = config["SEND_HOUR"]
+    dushanbe_minute = config["SEND_MINUTE"]
+    
+    # Конвертируем время Душанбе в UTC (Душанбе UTC+5)
+    utc_hour = (dushanbe_hour - 5) % 24
+    
+    return (current_time.hour == utc_hour and 
+            current_time.minute == dushanbe_minute and
+            current_time.second == 0)
+
 def scheduled_job():
     config = load_config()
     if not config["BOT_ENABLED"]:
@@ -69,20 +85,13 @@ def scheduled_job():
         send_daily_report(group_id)
         time.sleep(1)
 
-def setup_schedule():
+def main():
+    print("🚀 Бот Умный Город запускается...")
     config = load_config()
+    
     dushanbe_hour = config["SEND_HOUR"]
     dushanbe_minute = config["SEND_MINUTE"]
     utc_hour = (dushanbe_hour - 5) % 24
-    schedule_time = f"{utc_hour:02d}:{dushanbe_minute:02d}"
-    schedule.clear()
-    schedule.every().day.at(schedule_time).do(scheduled_job)
-    return dushanbe_hour, dushanbe_minute, utc_hour
-
-def main():
-    print("🚀 Бот Умный Город запускается...")
-    dushanbe_hour, dushanbe_minute, utc_hour = setup_schedule()
-    config = load_config()
     
     print("✅ Бот успешно запущен!")
     print(f"⏰ Расписание отправки:")
@@ -101,14 +110,23 @@ def main():
             time.sleep(1)
         print("✅ Тест завершен!\n")
     
+    last_sent_hour = -1
     while True:
         try:
-            schedule.run_pending()
+            # Проверяем сообщения админа
             check_admin_messages()
-            current_second = datetime.now().second
-            if current_second < 5:
-                setup_schedule()
-            time.sleep(5)
+            
+            # Проверяем, нужно ли отправить ежедневный отчет
+            if should_send_now():
+                scheduled_job()
+            
+            # Обновляем конфигурацию каждую минуту
+            current_minute = datetime.now().minute
+            if current_minute == 0:
+                config = load_config()
+            
+            time.sleep(1)
+            
         except KeyboardInterrupt:
             print("\n🛑 Бот остановлен пользователем")
             break
