@@ -1,95 +1,104 @@
 import json
 from datetime import datetime
 
-class HistoryEvents:
-    def __init__(self, json_file='events_database.json'):
-        self.json_file = json_file
-        self.events = self.load_events()
-    
-    def load_events(self):
-        """Загрузка событий из JSON файла"""
-        try:
-            with open(self.json_file, 'r', encoding='utf-8') as file:
-                return json.load(file)
-        except FileNotFoundError:
-            print(f"Файл {self.json_file} не найден")
-            return {}
-        except json.JSONDecodeError:
-            print(f"Ошибка чтения файла {self.json_file}")
-            return {}
-    
-    def save_events(self):
-        """Сохранение событий в JSON файл"""
-        try:
-            with open(self.json_file, 'w', encoding='utf-8') as file:
-                json.dump(self.events, file, ensure_ascii=False, indent=2)
-            return True
-        except Exception as e:
-            print(f"Ошибка сохранения файла: {e}")
-            return False
-    
-    def get_events_by_date(self, month, day):
-        """Получить события по дате (месяц и день)"""
-        date_key = f"{month:02d}{day:02d}"
-        return self.events.get(date_key, [])
-    
-    def get_today_events(self):
-        """Получить события на сегодняшнюю дату"""
-        today = datetime.now()
-        return self.get_events_by_date(today.month, today.day)
-    
-    def add_event(self, month, day, event_text):
-        """Добавить новое событие"""
-        date_key = f"{month:02d}{day:02d}"
-        if date_key not in self.events:
-            self.events[date_key] = []
-        
-        if event_text not in self.events[date_key]:
-            self.events[date_key].append(event_text)
-            return True
-        return False
-    
-    def search_events(self, keyword):
-        """Поиск событий по ключевому слову"""
-        results = {}
-        for date_key, events_list in self.events.items():
-            matching_events = [event for event in events_list if keyword.lower() in event.lower()]
-            if matching_events:
-                results[date_key] = matching_events
-        return results
-    
-    def get_all_dates_with_events(self):
-        """Получить все даты, для которых есть события"""
-        return list(self.events.keys())
-    
-    def get_events_count(self):
-        """Получить общее количество событий"""
-        count = 0
-        for events_list in self.events.values():
-            count += len(events_list)
-        return count
+def load_events():
+    """
+    Загружает события из JSON файла
+    """
+    try:
+        with open('events_database.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        print(f"Ошибка загрузки событий: {e}")
+        return {}
 
-# Пример использования
-if __name__ == "__main__":
-    history = HistoryEvents()
-    
-    print(f"Всего событий в базе: {history.get_events_count()}")
-    print(f"Даты с событиями: {len(history.get_all_dates_with_events())}")
-    
-    # Получить события на сегодня
-    today_events = history.get_today_events()
-    if today_events:
-        print(f"\nСобытия на сегодня:")
-        for event in today_events:
-            print(f"- {event}")
-    else:
-        print("\nНа сегодня событий нет")
-    
-    # Поиск событий
-    search_results = history.search_events("ГЭС")
-    if search_results:
-        print(f"\nСобытия связанные с ГЭС:")
-        for date_key, events in search_results.items():
-            print(f"Дата: {date_key[:2]}.{date_key[2:]}")
-            for event in events:
-                print(f"  - {event}")
+def save_events(events_db):
+    """
+    Сохраняет события в JSON файл
+    """
+    try:
+        with open('events_database.json', 'w', encoding='utf-8') as f:
+            json.dump(events_db, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"Ошибка сохранения событий: {e}")
+        return False
+
+def add_event(month, day, event_text):
+    """
+    Добавляет событие в базу данных
+    """
+    try:
+        events_db = load_events()
+        date_key = f"{month:02d}{day:02d}"
+        
+        if date_key not in events_db:
+            events_db[date_key] = []
+        
+        events_db[date_key].append(event_text)
+        
+        if save_events(events_db):
+            return f"✅ Событие добавлено!\n📅 {day:02d}.{month:02d}\n📝 {event_text}"
+        else:
+            return "❌ Ошибка сохранения события"
+            
+    except Exception as e:
+        return f"❌ Ошибка: {e}"
+
+def delete_event(month, day, event_index):
+    """
+    Удаляет событие из базы данных
+    """
+    try:
+        events_db = load_events()
+        date_key = f"{month:02d}{day:02d}"
+        
+        if date_key in events_db and 0 <= event_index - 1 < len(events_db[date_key]):
+            deleted_event = events_db[date_key].pop(event_index - 1)
+            
+            # Удаляем дату если событий не осталось
+            if not events_db[date_key]:
+                del events_db[date_key]
+            
+            if save_events(events_db):
+                return f"✅ Событие удалено!\n📅 {day:02d}.{month:02d}\n🗑️ {deleted_event}"
+            else:
+                return "❌ Ошибка сохранения изменений"
+        else:
+            return "❌ Событие не найдено!"
+            
+    except Exception as e:
+        return f"❌ Ошибка удаления: {e}"
+
+def get_tajikistan_history():
+    """
+    Возвращает исторические события для текущей даты
+    """
+    try:
+        events_db = load_events()
+        today = datetime.now()
+        date_key = f"{today.month:02d}{today.day:02d}"
+        events = events_db.get(date_key, [])
+        
+        if not events:
+            return "📜 На сегодня исторических событий не найдено"
+        
+        months = {
+            1: "ЯНВАРЯ", 2: "ФЕВРАЛЯ", 3: "МАРТА", 4: "АПРЕЛЯ", 
+            5: "МАЯ", 6: "ИЮНЯ", 7: "ИЮЛЯ", 8: "АВГУСТА",
+            9: "СЕНТЯБРЯ", 10: "ОКТЯБРЯ", 11: "НОЯБРЯ", 12: "ДЕКАБРЯ"
+        }
+        
+        month_name = months.get(today.month, "")
+        history_text = f"📜 ДЕНЬ В ИСТОРИИ ТАДЖИКИСТАНА – {today.day} {month_name}\n\n"
+        
+        for event in events:
+            history_text += f"• {event}\n"
+            
+        return history_text
+        
+    except Exception as e:
+        print(f"Ошибка получения истории: {e}")
+        return "📜 Информация об исторических событиях временно недоступна"
