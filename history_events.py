@@ -49,7 +49,7 @@ def add_event(month, day, event_text):
 
 def delete_event(month, day, event_index):
     """
-    Удаляет событие из базы данных
+    Удаляет событие из базу данных
     """
     try:
         events_db = load_events()
