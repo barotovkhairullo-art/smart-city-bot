@@ -1,21 +1,75 @@
-{
-  "1026": [
-    "2013 – В регионах Таджикистана введен энерголимит.",
-    "2020 – В Таджикистане получил лицензию промышленно-экспортный «Саноатсодиротбонк»"
-  ],
-  "1027": [
-    "1932 – Образованы Ишкашимский, Мургабский, Рушанский и Шугнанский районы в составе ГБАО."
-  ],
-  "1028": [
-    "2008 – Таджикский государственный национальный университет переименован в Таджикский национальный университет."
-  ],
-  "1029": [
-    "1951 - Образовано издательство «Дониш» Академии наук Таджикистана"
-  ],
-  "1030": [
-    "2000 – В Таджикистане введена новая национальная валюта – сомони."
-  ],
-  "1031": [
-    "2006 – В Ишкашимском районе ГБАО сдан в эксплуатацию третий по счету мост через Пяндж, соединяющий Таджикистан с Афганистаном."
-  ]
-}
+import json
+from datetime import datetime
+
+def load_events():
+    try:
+        with open('events_database.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_events(events_db):
+    try:
+        with open('events_database.json', 'w', encoding='utf-8') as f:
+            json.dump(events_db, f, ensure_ascii=False, indent=2)
+        return True
+    except:
+        return False
+
+def get_tajikistan_history():
+    try:
+        current_date = datetime.now()
+        month = current_date.month
+        day = current_date.day
+        
+        date_key = f"{month:02d}{day:02d}"
+        events_db = load_events()
+        
+        if date_key in events_db and events_db[date_key]:
+            events = events_db[date_key]
+            history_text = f"📜 ДЕНЬ В ИСТОРИИ ТАДЖИКИСТАНА - {day:02d}.{month:02d}\n\n"
+            for event in events:
+                history_text += f"• {event}\n"
+            return history_text
+        else:
+            return f"📜 ДЕНЬ В ИСТОРИИ ТАДЖИКИСТАНА - {day:02d}.{month:02d}\n\n• Исторических событий на эту дату не найдено"
+    except Exception as e:
+        return f"📜 ДЕНЬ В ИСТОРИИ ТАДЖИКИСТАНА\n\n• Информация временно недоступна"
+
+def add_event(month, day, event_text):
+    try:
+        events_db = load_events()
+        date_key = f"{month:02d}{day:02d}"
+        
+        if date_key not in events_db:
+            events_db[date_key] = []
+        
+        events_db[date_key].append(event_text)
+        
+        if save_events(events_db):
+            return f"✅ Событие добавлено для даты {day:02d}.{month:02d}"
+        else:
+            return "❌ Ошибка сохранения"
+    except Exception as e:
+        return f"❌ Ошибка: {e}"
+
+def delete_event(month, day, event_index):
+    try:
+        events_db = load_events()
+        date_key = f"{month:02d}{day:02d}"
+        
+        if date_key in events_db and 0 <= event_index < len(events_db[date_key]):
+            deleted_event = events_db[date_key].pop(event_index)
+            
+            # Если событий не осталось, удаляем дату
+            if not events_db[date_key]:
+                del events_db[date_key]
+            
+            if save_events(events_db):
+                return f"✅ Событие удалено: {deleted_event}"
+            else:
+                return "❌ Ошибка сохранения"
+        else:
+            return "❌ Событие не найдено"
+    except Exception as e:
+        return f"❌ Ошибка: {e}"
