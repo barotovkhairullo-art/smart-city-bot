@@ -1,9 +1,8 @@
 language = "python3"
-run = "python3 main.py"
+run = "python main.py"
 
 [packages]
 requests = "*"
-schedule = "*"
 
 [env]
 PYTHONUNBUFFERED = "1"
