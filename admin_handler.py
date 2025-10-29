@@ -331,7 +331,7 @@ def set_time_config(chat_id, config, hour, minute):
         save_config(config)
         user_states.pop(chat_id, None)
         utc_hour = (hour - 5) % 24
-        send_telegram_message(chat_id, f"✅ Время установлено!\n🕐 Душанбе: {hour:02d}:{minute:02d}\n🌐 Сервер: {utc_hour:02d}:{minute:02d}", reply_markup=get_main_keyboard())
+        send_telegram_message(chat_id, f"✅ Время установлено!\n🕐 Душанбе: {hour:02d}:{minute:02d}\n🌐 Сервер: {utc_hour:02d}:{minute:02d} UTC", reply_markup=get_main_keyboard())
     else:
         send_telegram_message(chat_id, "❌ Неверное время", reply_markup=get_time_keyboard())
 
@@ -491,7 +491,7 @@ def process_text_commands(message_text, chat_id, config):
 
 def show_time_settings(chat_id, config):
     utc_hour = (config["SEND_HOUR"] - 5) % 24
-    send_telegram_message(chat_id, f"⏰ Время отправки:\n🕐 Душанбе: {config['SEND_HOUR']:02d}:{config['SEND_MINUTE']:02d}\n🌐 Сервер: {utc_hour:02d}:{config['SEND_MINUTE']:02d}\n🔧 Статус: {'✅ ВКЛ' if config['BOT_ENABLED'] else '❌ ВЫКЛ'}")
+    send_telegram_message(chat_id, f"⏰ Время отправки:\n🕐 Душанбе: {config['SEND_HOUR']:02d}:{config['SEND_MINUTE']:02d}\n🌐 Сервер: {utc_hour:02d}:{config['SEND_MINUTE']:02d} UTC\n🔧 Статус: {'✅ ВКЛ' if config['BOT_ENABLED'] else '❌ ВЫКЛ'}")
 
 def enable_bot(chat_id, config):
     config["BOT_ENABLED"] = True
