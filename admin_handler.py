@@ -25,9 +25,10 @@ def send_telegram_message(chat_id, text, reply_markup=None):
 def get_main_keyboard():
     return {
         "keyboard": [
-            ["⏰ Изменить время", "📅 Управление событиями"],
-            ["👥 Управление группами", "🔧 Настройки"],
-            ["📨 Тестовая отправка", "✅ Вкл/❌ Выкл бота"]
+            ["⏰ Изменить время сводки", "🕐 Изменить время работы"],
+            ["📅 Управление событиями", "👥 Управление группами"],
+            ["🔧 Настройки", "📨 Тестовая отправка"],
+            ["✅ Вкл/❌ Выкл бота"]
         ],
         "resize_keyboard": True
     }
@@ -35,10 +36,20 @@ def get_main_keyboard():
 def get_time_keyboard():
     return {
         "keyboard": [
-            ["🕐 08:00", "🕐 10:00", "🕐 12:00"],
-            ["🕐 14:00", "🕐 16:00", "🕐 18:00"],
-            ["🕐 20:00", "🕐 22:00", "✏️ Другое время"],
+            ["🕐 07:00", "🕐 08:00", "🕐 09:00"],
+            ["🕐 10:00", "🕐 12:00", "🕐 14:00"],
+            ["🕐 16:00", "🕐 18:00", "✏️ Другое время"],
             ["🔙 Назад"]
+        ],
+        "resize_keyboard": True
+    }
+
+def get_working_hours_keyboard():
+    return {
+        "keyboard": [
+            ["🕐 06:30", "🕐 07:00", "🕐 07:30"],
+            ["🕐 08:00", "🕐 08:30", "🕐 09:00"],
+            ["✏️ Другое время", "🔙 Назад"]
         ],
         "resize_keyboard": True
     }
@@ -131,9 +142,14 @@ def process_admin_command(message_text, chat_id):
         send_telegram_message(chat_id, "❌ Доступ запрещен!")
         return
 
-    if message_text in ["⏰ Изменить время", "⏰ изменить время"]:
-        user_states[chat_id] = "waiting_for_time"
-        send_telegram_message(chat_id, "🕐 Выберите время:", reply_markup=get_time_keyboard())
+    if message_text in ["⏰ Изменить время сводки", "⏰ изменить время сводки"]:
+        user_states[chat_id] = "waiting_for_daily_time"
+        send_telegram_message(chat_id, "🕐 Выберите время для ежедневной сводки:", reply_markup=get_time_keyboard())
+        return
+
+    elif message_text in ["🕐 Изменить время работы", "🕐 изменить время работы"]:
+        user_states[chat_id] = "waiting_for_working_hours_time"
+        send_telegram_message(chat_id, "🕐 Выберите время для отправки информации о времени работы:", reply_markup=get_working_hours_keyboard())
         return
 
     elif message_text in ["📅 Управление событиями", "📅 управление событиями"]:
@@ -200,8 +216,13 @@ def process_admin_command(message_text, chat_id):
         return
 
     elif message_text == "✏️ Другое время":
-        user_states[chat_id] = "waiting_for_custom_time"
-        send_telegram_message(chat_id, "✏️ Введите время ЧЧ:ММ", reply_markup=get_cancel_keyboard())
+        current_state = user_states.get(chat_id)
+        if current_state == "waiting_for_daily_time":
+            user_states[chat_id] = "waiting_for_custom_daily_time"
+            send_telegram_message(chat_id, "✏️ Введите время для ежедневной сводки ЧЧ:ММ", reply_markup=get_cancel_keyboard())
+        elif current_state == "waiting_for_working_hours_time":
+            user_states[chat_id] = "waiting_for_custom_working_hours_time"
+            send_telegram_message(chat_id, "✏️ Введите время для отправки информации о времени работы ЧЧ:ММ", reply_markup=get_cancel_keyboard())
         return
 
     if message_text.startswith("👥 Группа "):
@@ -255,10 +276,14 @@ def process_admin_command(message_text, chat_id):
 
     current_state = user_states.get(chat_id)
     
-    if current_state == "waiting_for_time":
-        process_time_input(message_text, chat_id, config)
-    elif current_state == "waiting_for_custom_time":
-        process_custom_time_input(message_text, chat_id, config)
+    if current_state == "waiting_for_daily_time":
+        process_daily_time_input(message_text, chat_id, config)
+    elif current_state == "waiting_for_working_hours_time":
+        process_working_hours_time_input(message_text, chat_id, config)
+    elif current_state == "waiting_for_custom_daily_time":
+        process_custom_daily_time_input(message_text, chat_id, config)
+    elif current_state == "waiting_for_custom_working_hours_time":
+        process_custom_working_hours_time_input(message_text, chat_id, config)
     elif current_state and current_state.startswith("waiting_event_text_"):
         process_event_input(message_text, chat_id, current_state)
     elif current_state == "waiting_for_group_id":
@@ -271,21 +296,39 @@ def process_admin_command(message_text, chat_id):
     else:
         send_telegram_message(chat_id, "👑 Админ-панель", reply_markup=get_main_keyboard())
 
-def process_time_input(message_text, chat_id, config):
+def process_daily_time_input(message_text, chat_id, config):
     time_match = re.match(r'🕐\s*(\d{1,2}):(\d{2})', message_text)
     if time_match:
         hour = int(time_match.group(1))
         minute = int(time_match.group(2))
-        set_time_config(chat_id, config, hour, minute)
+        set_daily_time_config(chat_id, config, hour, minute)
     else:
         send_telegram_message(chat_id, "❌ Неверный формат", reply_markup=get_time_keyboard())
 
-def process_custom_time_input(message_text, chat_id, config):
+def process_working_hours_time_input(message_text, chat_id, config):
+    time_match = re.match(r'🕐\s*(\d{1,2}):(\d{2})', message_text)
+    if time_match:
+        hour = int(time_match.group(1))
+        minute = int(time_match.group(2))
+        set_working_hours_time_config(chat_id, config, hour, minute)
+    else:
+        send_telegram_message(chat_id, "❌ Неверный формат", reply_markup=get_working_hours_keyboard())
+
+def process_custom_daily_time_input(message_text, chat_id, config):
     time_match = re.match(r'(\d{1,2}):(\d{2})', message_text)
     if time_match:
         hour = int(time_match.group(1))
         minute = int(time_match.group(2))
-        set_time_config(chat_id, config, hour, minute)
+        set_daily_time_config(chat_id, config, hour, minute)
+    else:
+        send_telegram_message(chat_id, "❌ Неверный формат", reply_markup=get_cancel_keyboard())
+
+def process_custom_working_hours_time_input(message_text, chat_id, config):
+    time_match = re.match(r'(\d{1,2}):(\d{2})', message_text)
+    if time_match:
+        hour = int(time_match.group(1))
+        minute = int(time_match.group(2))
+        set_working_hours_time_config(chat_id, config, hour, minute)
     else:
         send_telegram_message(chat_id, "❌ Неверный формат", reply_markup=get_cancel_keyboard())
 
@@ -324,16 +367,27 @@ def show_events_for_date(chat_id, month, day, action_type):
     reply_markup = {"keyboard": keyboard, "resize_keyboard": True} if keyboard else None
     send_telegram_message(chat_id, message, reply_markup=reply_markup)
 
-def set_time_config(chat_id, config, hour, minute):
+def set_daily_time_config(chat_id, config, hour, minute):
     if 0 <= hour <= 23 and 0 <= minute <= 59:
         config["SEND_HOUR"] = hour
         config["SEND_MINUTE"] = minute
         save_config(config)
         user_states.pop(chat_id, None)
         utc_hour = (hour - 5) % 24
-        send_telegram_message(chat_id, f"✅ Время установлено!\n🕐 Душанбе: {hour:02d}:{minute:02d}\n🌐 Сервер: {utc_hour:02d}:{minute:02d} UTC", reply_markup=get_main_keyboard())
+        send_telegram_message(chat_id, f"✅ Время ежедневной сводки установлено!\n🕐 Душанбе: {hour:02d}:{minute:02d}\n🌐 Сервер: {utc_hour:02d}:{minute:02d} UTC", reply_markup=get_main_keyboard())
     else:
         send_telegram_message(chat_id, "❌ Неверное время", reply_markup=get_time_keyboard())
+
+def set_working_hours_time_config(chat_id, config, hour, minute):
+    if 0 <= hour <= 23 and 0 <= minute <= 59:
+        config["WORKING_HOURS_HOUR"] = hour
+        config["WORKING_HOURS_MINUTE"] = minute
+        save_config(config)
+        user_states.pop(chat_id, None)
+        utc_hour = (hour - 5) % 24
+        send_telegram_message(chat_id, f"✅ Время отправки информации о работе установлено!\n🕐 Душанбе: {hour:02d}:{minute:02d}\n🌐 Сервер: {utc_hour:02d}:{minute:02d} UTC", reply_markup=get_main_keyboard())
+    else:
+        send_telegram_message(chat_id, "❌ Неверное время", reply_markup=get_working_hours_keyboard())
 
 def show_events_list(chat_id):
     events_db = load_events()
@@ -349,8 +403,9 @@ def show_events_list(chat_id):
     send_telegram_message(chat_id, message)
 
 def show_settings(chat_id, config):
-    utc_hour = (config["SEND_HOUR"] - 5) % 24
-    send_telegram_message(chat_id, f"⚙️ Настройки:\n🕐 Время: {config['SEND_HOUR']:02d}:{config['SEND_MINUTE']:02d} (Душанбе)\n🌐 Сервер: {utc_hour:02d}:{config['SEND_MINUTE']:02d} (UTC)\n🔧 Статус: {'✅ ВКЛ' if config['BOT_ENABLED'] else '❌ ВЫКЛ'}\n👑 Админов: {len(config['ADMIN_IDS'])}\n👥 Групп: {len(config.get('GROUP_IDS', []))}\n🆔 Ваш ID: {chat_id}")
+    utc_daily_hour = (config["SEND_HOUR"] - 5) % 24
+    utc_working_hours_hour = (config["WORKING_HOURS_HOUR"] - 5) % 24
+    send_telegram_message(chat_id, f"⚙️ Настройки:\n\n📅 Ежедневная сводка:\n🕐 Душанбе: {config['SEND_HOUR']:02d}:{config['SEND_MINUTE']:02d}\n🌐 Сервер: {utc_daily_hour:02d}:{config['SEND_MINUTE']:02d}\n\n🕐 Время работы:\n🕐 Душанбе: {config['WORKING_HOURS_HOUR']:02d}:{config['WORKING_HOURS_MINUTE']:02d}\n🌐 Сервер: {utc_working_hours_hour:02d}:{config['WORKING_HOURS_MINUTE']:02d}\n\n🔧 Статус: {'✅ ВКЛ' if config['BOT_ENABLED'] else '❌ ВЫКЛ'}\n👑 Админов: {len(config['ADMIN_IDS'])}\n👥 Групп: {len(config.get('GROUP_IDS', []))}\n🆔 Ваш ID: {chat_id}")
 
 def send_test_message(chat_id):
     from history_events import get_tajikistan_history
@@ -460,9 +515,18 @@ def process_text_commands(message_text, chat_id, config):
             try:
                 hour = int(parts[1])
                 minute = int(parts[2])
-                set_time_config(chat_id, config, hour, minute)
+                set_daily_time_config(chat_id, config, hour, minute)
             except:
                 send_telegram_message(chat_id, "❌ Ошибка! Пример: /settime 14 30")
+    elif message_text.startswith('/setworkingtime'):
+        parts = message_text.split()
+        if len(parts) == 3:
+            try:
+                hour = int(parts[1])
+                minute = int(parts[2])
+                set_working_hours_time_config(chat_id, config, hour, minute)
+            except:
+                send_telegram_message(chat_id, "❌ Ошибка! Пример: /setworkingtime 7 30")
     elif message_text.startswith('/time'):
         show_time_settings(chat_id, config)
     elif message_text.startswith('/addevent'):
@@ -490,8 +554,9 @@ def process_text_commands(message_text, chat_id, config):
         send_telegram_message(chat_id, "❌ Неизвестная команда", reply_markup=get_main_keyboard())
 
 def show_time_settings(chat_id, config):
-    utc_hour = (config["SEND_HOUR"] - 5) % 24
-    send_telegram_message(chat_id, f"⏰ Время отправки:\n🕐 Душанбе: {config['SEND_HOUR']:02d}:{config['SEND_MINUTE']:02d}\n🌐 Сервер: {utc_hour:02d}:{config['SEND_MINUTE']:02d} UTC\n🔧 Статус: {'✅ ВКЛ' if config['BOT_ENABLED'] else '❌ ВЫКЛ'}")
+    utc_daily_hour = (config["SEND_HOUR"] - 5) % 24
+    utc_working_hours_hour = (config["WORKING_HOURS_HOUR"] - 5) % 24
+    send_telegram_message(chat_id, f"⏰ Время отправки:\n\n📅 Ежедневная сводка:\n🕐 Душанбе: {config['SEND_HOUR']:02d}:{config['SEND_MINUTE']:02d}\n🌐 Сервер: {utc_daily_hour:02d}:{config['SEND_MINUTE']:02d} UTC\n\n🕐 Время работы:\n🕐 Душанбе: {config['WORKING_HOURS_HOUR']:02d}:{config['WORKING_HOURS_MINUTE']:02d}\n🌐 Сервер: {utc_working_hours_hour:02d}:{config['WORKING_HOURS_MINUTE']:02d} UTC\n\n🔧 Статус: {'✅ ВКЛ' if config['BOT_ENABLED'] else '❌ ВЫКЛ'}")
 
 def enable_bot(chat_id, config):
     config["BOT_ENABLED"] = True
