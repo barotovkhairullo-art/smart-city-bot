@@ -17,6 +17,28 @@ def load_config():
     with open('config.json', 'r') as f:
         return json.load(f)
 
+def load_reminders():
+    try:
+        with open('reminders.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        # Создаем файл с напоминанием по умолчанию
+        default_reminder = {
+            "enabled": True,
+            "send_time": "16:55",
+            "message": "⏰ Осталось 5 минут перед выходом! Не забудьте отключить все электроприборы и привести рабочее место в порядок! 💡"
+        }
+        save_reminders(default_reminder)
+        return default_reminder
+
+def save_reminders(reminders_data):
+    try:
+        with open('reminders.json', 'w', encoding='utf-8') as f:
+            json.dump(reminders_data, f, ensure_ascii=False, indent=2)
+        return True
+    except:
+        return False
+
 def send_sticker(group_id):
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendSticker"
@@ -37,6 +59,59 @@ def get_dushanbe_time():
     utc_now = datetime.now(timezone.utc)
     dushanbe_time = utc_now + timedelta(hours=5)
     return dushanbe_time.replace(tzinfo=None)
+
+def send_reminder_message():
+    """Отправляет напоминание перед окончанием рабочего дня"""
+    try:
+        reminders = load_reminders()
+        
+        if not reminders["enabled"]:
+            return False
+            
+        config = load_config()
+        groups = config.get("GROUP_IDS", [])
+        
+        if not groups:
+            return False
+        
+        success_count = 0
+        for group_id in groups:
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            data = {
+                "chat_id": group_id,
+                "text": reminders["message"]
+            }
+            
+            response = requests.post(url, data=data)
+            
+            if response.status_code == 200:
+                print(f"✅ Напоминание отправлено в группу {group_id}!")
+                success_count += 1
+            else:
+                print(f"❌ Ошибка отправки напоминания в группу {group_id}: {response.text}")
+        
+        return success_count > 0
+        
+    except Exception as e:
+        print(f"❌ Ошибка отправки напоминания: {e}")
+        return False
+
+def should_send_reminder():
+    """Проверяет, нужно ли отправить напоминание"""
+    reminders = load_reminders()
+    
+    if not reminders["enabled"]:
+        return False
+        
+    current_time = get_dushanbe_time()
+    reminder_time = reminders["send_time"]
+    
+    # Получаем час и минуту из времени напоминания
+    reminder_hour, reminder_minute = map(int, reminder_time.split(':'))
+    
+    # Проверяем совпадает ли текущее время Душанбе с временем напоминания
+    return (current_time.hour == reminder_hour and 
+            current_time.minute == reminder_minute)
 
 def get_work_time_countdown():
     """Получает обратный отсчет до начала/окончания рабочего дня в Душанбе"""
@@ -322,6 +397,7 @@ def main():
         return
     
     config = load_config()
+    reminders = load_reminders()
     
     dushanbe_hour = config["SEND_HOUR"]
     dushanbe_minute = config["SEND_MINUTE"]
@@ -330,10 +406,7 @@ def main():
     print(f"⏰ РАСПИСАНИЕ ОТПРАВКИ:")
     print(f"   📍 Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d} (UTC+5)")
     print(f"🔄 ОБНОВЛЕНИЕ ОТСЧЕТА: каждую минуту")
-    print(f"🎯 РАЗНЫЕ МОТИВАЦИОННЫЕ ФРАЗЫ:")
-    print(f"   - Утром: добрые пожелания")
-    print(f"   - Днем: мотивация для работы") 
-    print(f"   - Вечером: благодарность за работу")
+    print(f"⏰ НАПОМИНАНИЕ: {reminders['send_time']} - {'✅ ВКЛ' if reminders['enabled'] else '❌ ВЫКЛ'}")
     print(f"🔧 Статус бота: {'✅ ВКЛЮЧЕН' if config['BOT_ENABLED'] else '❌ ВЫКЛЮЧЕН'}")
     print(f"👥 Групп для рассылки: {len(config.get('GROUP_IDS', []))}")
     print("👑 Админ-панель активна!")
@@ -359,11 +432,12 @@ def main():
     print(f"\n{'='*50}")
     print("⏳ Ожидание времени для автоматической отправки...")
     print("🔄 Обратный отсчет будет обновляться каждую минуту")
-    print("🎯 Разные мотивационные фразы в зависимости от времени")
+    print(f"⏰ Напоминание в {reminders['send_time']}")
     print("="*50)
     
     last_minute = -1
     last_update_minute = -1
+    reminder_sent_today = False
     
     while True:
         try:
@@ -378,6 +452,17 @@ def main():
                 last_update_minute = current_time.minute
                 print(f"🔄 Обновление обратного отсчета... Душанбе: {dushanbe_time.strftime('%H:%M')}")
                 start_countdown_updates()
+            
+            # Проверяем и отправляем напоминание
+            if should_send_reminder() and not reminder_sent_today:
+                print(f"\n⏰ ВРЕМЯ НАПОМИНАНИЯ! Душанбе: {dushanbe_time.strftime('%H:%M:%S')}")
+                if send_reminder_message():
+                    reminder_sent_today = True
+                    print("✅ Напоминание отправлено!")
+            
+            # Сбрасываем флаг напоминания в полночь
+            if dushanbe_time.hour == 0 and dushanbe_time.minute == 0:
+                reminder_sent_today = False
             
             # Логируем смену минуты
             if current_time.minute != last_minute:
