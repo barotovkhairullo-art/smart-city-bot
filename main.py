@@ -20,10 +20,13 @@ def send_sticker(group_id):
         response = requests.post(url, data=data)
         if response.status_code == 200:
             print(f"✅ Стикер отправлен в группу {group_id}!")
+            return True
         else:
             print(f"❌ Ошибка отправки стикера в группу {group_id}: {response.text}")
+            return False
     except Exception as e:
         print(f"❌ Ошибка стикера: {e}")
+        return False
 
 def send_daily_report(group_id):
     try:
@@ -60,12 +63,14 @@ def should_send_now():
     dushanbe_hour = config["SEND_HOUR"]
     dushanbe_minute = config["SEND_MINUTE"]
     
-    # Конвертируем время Душанбе в UTC (Душанбе UTC+5)
+    # Душанбе UTC+5, сервер UTC
+    # Если хотим 9:13 Душанбе, на сервере должно быть 4:13
     utc_hour = (dushanbe_hour - 5) % 24
     
-    # Логирование для отладки
-    if current_time.second == 0:  # Логируем только каждую минуту
-        print(f"🕐 Проверка времени: Сервер {current_time.hour:02d}:{current_time.minute:02d}, Нужно: {utc_hour:02d}:{dushanbe_minute:02d} (UTC)")
+    # Отладочная информация
+    if current_time.second == 0:
+        print(f"🕐 Проверка времени: Сервер {current_time.hour:02d}:{current_time.minute:02d} | Нужно: {utc_hour:02d}:{dushanbe_minute:02d} UTC")
+        print(f"   Соответствует Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d} (UTC+5)")
     
     return (current_time.hour == utc_hour and 
             current_time.minute == dushanbe_minute and
@@ -80,14 +85,18 @@ def scheduled_job():
     current_time = datetime.now().strftime('%H:%M:%S')
     groups = config.get("GROUP_IDS", [])
     
-    print(f"\n🔄 Автоматическая отправка в {current_time}")
+    print(f"\n🎯 АВТОМАТИЧЕСКАЯ ОТПРАВКА в {current_time}")
     print(f"📢 Отправка в {len(groups)} групп")
     
+    success_count = 0
     for group_id in groups:
-        send_sticker(group_id)
-        time.sleep(2)
-        send_daily_report(group_id)
+        if send_sticker(group_id):
+            time.sleep(2)
+            if send_daily_report(group_id):
+                success_count += 1
         time.sleep(1)
+    
+    print(f"✅ Успешно отправлено в {success_count}/{len(groups)} групп")
 
 def test_bot_connection():
     """Проверка соединения с Telegram"""
@@ -95,7 +104,9 @@ def test_bot_connection():
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            print("✅ Связь с Telegram API установлена")
+            data = response.json()
+            print(f"✅ Связь с Telegram API установлена")
+            print(f"🤖 Бот: {data['result']['first_name']} (@{data['result']['username']})")
             return True
         else:
             print(f"❌ Ошибка связи с Telegram: {response.text}")
@@ -104,8 +115,48 @@ def test_bot_connection():
         print(f"❌ Ошибка подключения к Telegram: {e}")
         return False
 
+def force_send_test():
+    """Принудительная отправка для теста"""
+    print("\n" + "="*50)
+    print("🚨 ТЕСТОВАЯ ОТПРАВКА ПО КОМАНДЕ")
+    print("="*50)
+    
+    config = load_config()
+    groups = config.get("GROUP_IDS", [])
+    
+    if not groups:
+        print("❌ Нет групп для отправки")
+        return
+    
+    success_count = 0
+    for group_id in groups:
+        print(f"\n📤 Отправка в группу: {group_id}")
+        if send_sticker(group_id):
+            time.sleep(2)
+            if send_daily_report(group_id):
+                success_count += 1
+        time.sleep(1)
+    
+    print(f"\n📊 Итог теста: успешно в {success_count}/{len(groups)} групп")
+
+def check_current_time():
+    """Проверка текущего времени"""
+    current_time = datetime.now()
+    config = load_config()
+    dushanbe_hour = config["SEND_HOUR"]
+    dushanbe_minute = config["SEND_MINUTE"]
+    utc_hour = (dushanbe_hour - 5) % 24
+    
+    print(f"\n🕐 ТЕКУЩЕЕ ВРЕМЯ:")
+    print(f"   Сервер (UTC): {current_time.hour:02d}:{current_time.minute:02d}:{current_time.second:02d}")
+    print(f"   Душанбе (UTC+5): {(current_time.hour + 5) % 24:02d}:{current_time.minute:02d}")
+    print(f"   Отправка запланирована на:")
+    print(f"   - Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d}")
+    print(f"   - Сервер: {utc_hour:02d}:{dushanbe_minute:02d}")
+
 def main():
     print("🚀 Бот Умный Город запускается...")
+    print("="*50)
     
     # Проверка соединения с Telegram
     if not test_bot_connection():
@@ -118,34 +169,53 @@ def main():
     dushanbe_minute = config["SEND_MINUTE"]
     utc_hour = (dushanbe_hour - 5) % 24
     
-    print("✅ Бот успешно запущен!")
-    print(f"⏰ Расписание отправки:")
+    print(f"\n✅ Бот успешно запущен!")
+    print(f"⏰ РАСПИСАНИЕ ОТПРАВКИ:")
     print(f"   📍 Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d} (UTC+5)")
     print(f"   🌐 Сервер: {utc_hour:02d}:{dushanbe_minute:02d} (UTC)")
     print(f"🔧 Статус бота: {'✅ ВКЛЮЧЕН' if config['BOT_ENABLED'] else '❌ ВЫКЛЮЧЕН'}")
+    print(f"👥 Групп для рассылки: {len(config.get('GROUP_IDS', []))}")
     print("👑 Админ-панель активна!")
     
+    # Проверка текущего времени
+    check_current_time()
+    
     if config["BOT_ENABLED"]:
-        print("\n🔄 Выполняю тестовую отправку...")
+        print(f"\n🔄 Выполняю тестовую отправку...")
         groups = config.get("GROUP_IDS", [])
+        success_count = 0
         for group_id in groups:
-            send_sticker(group_id)
-            time.sleep(2)
-            send_daily_report(group_id)
+            print(f"\n📤 Тест в группу: {group_id}")
+            if send_sticker(group_id):
+                time.sleep(2)
+                if send_daily_report(group_id):
+                    success_count += 1
             time.sleep(1)
-        print("✅ Тест завершен!\n")
+        print(f"\n✅ Тест завершен! Успешно: {success_count}/{len(groups)} групп")
     
+    print(f"\n{'='*50}")
     print("⏳ Ожидание времени для автоматической отправки...")
+    print("Для принудительной отправки напишите боту /test")
+    print("="*50)
     
+    last_minute = -1
     while True:
         try:
-            # Проверяем сообщения админа
+            current_time = datetime.now()
+            
+            # Проверяем сообщения админа каждую секунду
             check_admin_messages()
+            
+            # Логируем смену минуты
+            if current_time.minute != last_minute:
+                last_minute = current_time.minute
+                print(f"🕐 Текущее время: {current_time.hour:02d}:{current_time.minute:02d} UTC (Душанбе: {(current_time.hour + 5) % 24:02d}:{current_time.minute:02d})")
             
             # Проверяем, нужно ли отправить ежедневный отчет
             if should_send_now():
-                print(f"\n🎯 Время отправки наступило! {datetime.now().strftime('%H:%M:%S')}")
+                print(f"\n🎯 ВРЕМЯ ОТПРАВКИ НАСТУПИЛО! {current_time.strftime('%H:%M:%S')} UTC")
                 scheduled_job()
+                print(f"\n✅ Отправка завершена. Следующая - завтра в {utc_hour:02d}:{dushanbe_minute:02d} UTC")
             
             time.sleep(1)
             
