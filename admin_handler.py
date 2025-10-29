@@ -11,6 +11,28 @@ def load_config():
     with open('config.json', 'r') as f:
         return json.load(f)
 
+def load_reminders():
+    try:
+        with open('reminders.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        # Создаем файл с напоминанием по умолчанию
+        default_reminder = {
+            "enabled": True,
+            "send_time": "16:55",
+            "message": "⏰ Осталось 5 минут перед выходом! Не забудьте отключить все электроприборы и привести рабочее место в порядок! 💡"
+        }
+        save_reminders(default_reminder)
+        return default_reminder
+
+def save_reminders(reminders_data):
+    try:
+        with open('reminders.json', 'w', encoding='utf-8') as f:
+            json.dump(reminders_data, f, ensure_ascii=False, indent=2)
+        return True
+    except:
+        return False
+
 def save_config(config):
     with open('config.json', 'w') as f:
         json.dump(config, f, indent=2)
@@ -27,7 +49,8 @@ def get_main_keyboard():
         "keyboard": [
             ["⏰ Изменить время", "📅 Управление событиями"],
             ["👥 Управление группами", "🔧 Настройки"],
-            ["📨 Тестовая отправка", "✅ Вкл/❌ Выкл бота"]
+            ["📨 Тестовая отправка", "✅ Вкл/❌ Выкл бота"],
+            ["⏰ Управление напоминаниями"]
         ],
         "resize_keyboard": True
     }
@@ -58,6 +81,17 @@ def get_groups_keyboard():
         "keyboard": [
             ["➕ Добавить группу", "📋 Список групп"],
             ["✏️ Изменить группу", "🗑️ Удалить группу"],
+            ["🔙 Назад"]
+        ],
+        "resize_keyboard": True
+    }
+
+def get_reminders_keyboard():
+    return {
+        "keyboard": [
+            ["✅ Вкл/❌ Выкл напоминание"],
+            ["✏️ Изменить текст напоминания"],
+            ["⏰ Изменить время напоминания"],
             ["🔙 Назад"]
         ],
         "resize_keyboard": True
@@ -125,6 +159,20 @@ def get_groups_list_keyboard():
     keyboard.append(["🔙 Назад"])
     return {"keyboard": keyboard, "resize_keyboard": True}
 
+def show_reminders_settings(chat_id):
+    try:
+        reminders = load_reminders()
+        
+        status = "✅ ВКЛ" if reminders["enabled"] else "❌ ВЫКЛ"
+        message = f"⏰ НАСТРОЙКИ НАПОМИНАНИЯ\n\n"
+        message += f"🔧 Статус: {status}\n"
+        message += f"🕐 Время: {reminders['send_time']}\n"
+        message += f"📝 Текст: {reminders['message']}"
+        
+        send_telegram_message(chat_id, message, reply_markup=get_reminders_keyboard())
+    except Exception as e:
+        send_telegram_message(chat_id, f"❌ Ошибка: {e}")
+
 def process_admin_command(message_text, chat_id):
     config = load_config()
     if chat_id not in config["ADMIN_IDS"]:
@@ -142,6 +190,10 @@ def process_admin_command(message_text, chat_id):
 
     elif message_text in ["👥 Управление группами", "👥 управление группами"]:
         send_telegram_message(chat_id, "👥 Управление группами:", reply_markup=get_groups_keyboard())
+        return
+
+    elif message_text in ["⏰ Управление напоминаниями", "⏰ управление напоминаниями"]:
+        show_reminders_settings(chat_id)
         return
 
     elif message_text in ["📝 Добавить событие", "📝 добавить событие"]:
@@ -192,6 +244,22 @@ def process_admin_command(message_text, chat_id):
 
     elif message_text in ["✅ Вкл/❌ Выкл бота", "✅ вкл/❌ выкл бота"]:
         toggle_bot(chat_id, config)
+        return
+
+    elif message_text in ["✅ Вкл/❌ Выкл напоминание", "✅ вкл/❌ выкл напоминание"]:
+        toggle_reminder(chat_id)
+        return
+
+    elif message_text in ["✏️ Изменить текст напоминания", "✏️ изменить текст напоминания"]:
+        user_states[chat_id] = "waiting_reminder_text"
+        reminders = load_reminders()
+        send_telegram_message(chat_id, f"📝 Текущий текст: {reminders['message']}\n\nВведите новый текст напоминания:", reply_markup=get_cancel_keyboard())
+        return
+
+    elif message_text in ["⏰ Изменить время напоминания", "⏰ изменить время напоминания"]:
+        user_states[chat_id] = "waiting_reminder_time"
+        reminders = load_reminders()
+        send_telegram_message(chat_id, f"🕐 Текущее время: {reminders['send_time']}\n\nВведите новое время в формате ЧЧ:ММ:", reply_markup=get_cancel_keyboard())
         return
 
     elif message_text in ["🔙 Назад", "🔙 назад", "🔙 Отменить", "🔙 отменить"]:
@@ -266,10 +334,72 @@ def process_admin_command(message_text, chat_id):
     elif current_state and current_state.startswith("waiting_new_group_id_"):
         group_index = int(current_state.split('_')[-1])
         edit_group(chat_id, group_index, message_text)
+    elif current_state == "waiting_reminder_text":
+        update_reminder_text(chat_id, message_text)
+    elif current_state == "waiting_reminder_time":
+        update_reminder_time(chat_id, message_text)
     elif message_text.startswith('/'):
         process_text_commands(message_text, chat_id, config)
     else:
         send_telegram_message(chat_id, "👑 Админ-панель", reply_markup=get_main_keyboard())
+
+def toggle_reminder(chat_id):
+    try:
+        reminders = load_reminders()
+        reminders["enabled"] = not reminders["enabled"]
+        save_reminders(reminders)
+        status = "✅ ВКЛЮЧЕНО" if reminders["enabled"] else "❌ ВЫКЛЮЧЕНО"
+        send_telegram_message(chat_id, f"✅ Напоминание {status.lower()}!", reply_markup=get_reminders_keyboard())
+    except Exception as e:
+        send_telegram_message(chat_id, f"❌ Ошибка: {e}")
+
+def update_reminder_text(chat_id, new_text):
+    try:
+        if not new_text.strip():
+            send_telegram_message(chat_id, "❌ Текст не может быть пустым!", reply_markup=get_cancel_keyboard())
+            return
+            
+        reminders = load_reminders()
+        old_text = reminders["message"]
+        reminders["message"] = new_text.strip()
+        save_reminders(reminders)
+        user_states.pop(chat_id, None)
+        
+        message = f"✅ Текст напоминания обновлен!\n\n"
+        message += f"📝 Было: {old_text}\n"
+        message += f"📝 Стало: {reminders['message']}"
+        
+        send_telegram_message(chat_id, message, reply_markup=get_reminders_keyboard())
+    except Exception as e:
+        send_telegram_message(chat_id, f"❌ Ошибка: {e}")
+
+def update_reminder_time(chat_id, new_time):
+    try:
+        time_match = re.match(r'(\d{1,2}):(\d{2})', new_time)
+        if not time_match:
+            send_telegram_message(chat_id, "❌ Неверный формат времени! Используйте ЧЧ:ММ", reply_markup=get_cancel_keyboard())
+            return
+            
+        hour = int(time_match.group(1))
+        minute = int(time_match.group(2))
+        
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            send_telegram_message(chat_id, "❌ Неверное время! Часы: 0-23, Минуты: 0-59", reply_markup=get_cancel_keyboard())
+            return
+            
+        reminders = load_reminders()
+        old_time = reminders["send_time"]
+        reminders["send_time"] = f"{hour:02d}:{minute:02d}"
+        save_reminders(reminders)
+        user_states.pop(chat_id, None)
+        
+        message = f"✅ Время напоминания обновлено!\n\n"
+        message += f"🕐 Было: {old_time}\n"
+        message += f"🕐 Стало: {reminders['send_time']}"
+        
+        send_telegram_message(chat_id, message, reply_markup=get_reminders_keyboard())
+    except Exception as e:
+        send_telegram_message(chat_id, f"❌ Ошибка: {e}")
 
 def process_time_input(message_text, chat_id, config):
     time_match = re.match(r'🕐\s*(\d{1,2}):(\d{2})', message_text)
@@ -349,8 +479,17 @@ def show_events_list(chat_id):
     send_telegram_message(chat_id, message)
 
 def show_settings(chat_id, config):
+    reminders = load_reminders()
     utc_hour = (config["SEND_HOUR"] - 5) % 24
-    send_telegram_message(chat_id, f"⚙️ Настройки:\n🕐 Время: {config['SEND_HOUR']:02d}:{config['SEND_MINUTE']:02d} (Душанбе)\n🌐 Сервер: {utc_hour:02d}:{config['SEND_MINUTE']:02d} (UTC)\n🔧 Статус: {'✅ ВКЛ' if config['BOT_ENABLED'] else '❌ ВЫКЛ'}\n👑 Админов: {len(config['ADMIN_IDS'])}\n👥 Групп: {len(config.get('GROUP_IDS', []))}\n🆔 Ваш ID: {chat_id}")
+    message = f"⚙️ Настройки:\n"
+    message += f"🕐 Время отправки: {config['SEND_HOUR']:02d}:{config['SEND_MINUTE']:02d} (Душанбе)\n"
+    message += f"🌐 Сервер: {utc_hour:02d}:{config['SEND_MINUTE']:02d} (UTC)\n"
+    message += f"🔧 Статус бота: {'✅ ВКЛ' if config['BOT_ENABLED'] else '❌ ВЫКЛ'}\n"
+    message += f"⏰ Напоминание: {'✅ ВКЛ' if reminders['enabled'] else '❌ ВЫКЛ'} в {reminders['send_time']}\n"
+    message += f"👑 Админов: {len(config['ADMIN_IDS'])}\n"
+    message += f"👥 Групп: {len(config.get('GROUP_IDS', []))}\n"
+    message += f"🆔 Ваш ID: {chat_id}"
+    send_telegram_message(chat_id, message)
 
 def send_test_message(chat_id):
     from history_events import get_tajikistan_history
