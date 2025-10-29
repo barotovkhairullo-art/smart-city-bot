@@ -103,13 +103,11 @@ def get_work_time_countdown():
         # До начала рабочего дня
         start_hours = time_to_start.seconds // 3600
         start_minutes = (time_to_start.seconds % 3600) // 60
-        start_seconds = time_to_start.seconds % 60
-        start_text = f"⏳ До начала рабочего дня: {start_hours:02d}:{start_minutes:02d}:{start_seconds:02d}"
+        start_text = f"⏳ До начала рабочего дня: {start_hours:02d}:{start_minutes:02d}"
         
         end_hours = time_to_end.seconds // 3600
         end_minutes = (time_to_end.seconds % 3600) // 60
-        end_seconds = time_to_end.seconds % 60
-        end_text = f"⏳ До конца рабочего дня осталось: {end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
+        end_text = f"⏳ До конца рабочего дня осталось: {end_hours:02d}:{end_minutes:02d}"
         
         motivational_text = random.choice(motivational_messages_before_start)
         
@@ -119,8 +117,7 @@ def get_work_time_countdown():
         
         end_hours = time_to_end.seconds // 3600
         end_minutes = (time_to_end.seconds % 3600) // 60
-        end_seconds = time_to_end.seconds % 60
-        end_text = f"⏳ До конца рабочего дня осталось: {end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
+        end_text = f"⏳ До конца рабочего дня осталось: {end_hours:02d}:{end_minutes:02d}"
         
         motivational_text = random.choice(motivational_messages_during_work)
         
@@ -363,7 +360,6 @@ def main():
     print("⏳ Ожидание времени для автоматической отправки...")
     print("🔄 Обратный отсчет будет обновляться каждую минуту")
     print("🎯 Разные мотивационные фразы в зависимости от времени")
-    print("⏰ Отсчет с секундами")
     print("="*50)
     
     last_minute = -1
