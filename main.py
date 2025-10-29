@@ -28,15 +28,52 @@ def send_sticker(group_id):
         print(f"❌ Ошибка стикера: {e}")
         return False
 
+def get_work_time_countdown():
+    """Получает обратный отсчет до начала/окончания рабочего дня"""
+    now = datetime.now()
+    
+    # Рабочее время с 8:00 до 17:00
+    work_start = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    work_end = now.replace(hour=17, minute=0, second=0, microsecond=0)
+    
+    # Если сейчас до начала рабочего дня
+    if now < work_start:
+        time_left = work_start - now
+        hours = time_left.seconds // 3600
+        minutes = (time_left.seconds % 3600) // 60
+        return f"⏳ До начала рабочего дня: {hours:02d}:{minutes:02d}"
+    
+    # Если сейчас рабочее время
+    elif work_start <= now <= work_end:
+        time_left = work_end - now
+        hours = time_left.seconds // 3600
+        minutes = (time_left.seconds % 3600) // 60
+        return f"⏳ До конца рабочего дня: {hours:02d}:{minutes:02d}"
+    
+    # Если рабочий день уже закончился
+    else:
+        # Считаем до начала следующего рабочего дня
+        tomorrow = now.replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        time_left = tomorrow - now
+        hours = time_left.seconds // 3600
+        minutes = (time_left.seconds % 3600) // 60
+        return f"⏳ До начала рабочего дня: {hours:02d}:{minutes:02d}"
+
 def send_daily_report(group_id):
     try:
         history_text = get_tajikistan_history()
         weather_text = get_dushanbe_weather()
         
+        # Получаем обратный отсчет времени работы
+        countdown_text = get_work_time_countdown()
+        
         message = f"📅 ЕЖЕДНЕВНАЯ СВОДКА\n\n"
         message += history_text + "\n\n"
         message += weather_text + "\n\n"
-        message += "🇹🇯 Государственное унитарное предприятие «Умный город»"
+        message += "🏢 Государственное унитарное предприятие «Умный город»\n"
+        message += "🕐 Время работы: 8:00 - 17:00\n"
+        message += countdown_text + "\n\n"
+        message += "🇹🇯"
         
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         data = {"chat_id": group_id, "text": message}
