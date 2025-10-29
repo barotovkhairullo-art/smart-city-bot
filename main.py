@@ -64,22 +64,17 @@ def should_send_now():
     dushanbe_minute = config["SEND_MINUTE"]
     
     # Душанбе UTC+5, сервер UTC
-    # Конвертируем время Душанбе в UTC
-    utc_hour = (dushanbe_hour - 5) % 24
-    
     # Получаем текущее время Душанбе
     current_dushanbe_hour = (current_time.hour + 5) % 24
     current_dushanbe_minute = current_time.minute
     
-    # Отладочная информация
-    if current_time.second == 0:
-        print(f"🕐 Проверка времени: Сервер {current_time.hour:02d}:{current_time.minute:02d} | Душанбе {current_dushanbe_hour:02d}:{current_dushanbe_minute:02d}")
-        print(f"   Отправка запланирована на: Душанбе {dushanbe_hour:02d}:{dushanbe_minute:02d} (UTC {utc_hour:02d}:{dushanbe_minute:02d})")
+    # Отладочная информация каждые 30 секунд
+    if current_time.second % 30 == 0:
+        print(f"🕐 Проверка времени: Душанбе {current_dushanbe_hour:02d}:{current_dushanbe_minute:02d} | Ожидаем: {dushanbe_hour:02d}:{dushanbe_minute:02d}")
     
     # Проверяем совпадает ли текущее время Душанбе с временем отправки
     return (current_dushanbe_hour == dushanbe_hour and 
-            current_dushanbe_minute == dushanbe_minute and
-            current_time.second == 0)
+            current_dushanbe_minute == dushanbe_minute)
 
 def scheduled_job():
     config = load_config()
@@ -212,14 +207,16 @@ def main():
             # Логируем смену минуты
             if current_time.minute != last_minute:
                 last_minute = current_time.minute
-                dushanbe_hour = (current_time.hour + 5) % 24
-                print(f"🕐 Текущее время: {current_time.hour:02d}:{current_time.minute:02d} UTC (Душанбе: {dushanbe_hour:02d}:{current_time.minute:02d})")
+                current_dushanbe_hour = (current_time.hour + 5) % 24
+                print(f"🕐 Текущее время: {current_time.hour:02d}:{current_time.minute:02d} UTC (Душанбе: {current_dushanbe_hour:02d}:{current_time.minute:02d}) - Ожидаем: {dushanbe_hour:02d}:{dushanbe_minute:02d}")
             
             # Проверяем, нужно ли отправить ежедневный отчет
             if should_send_now():
                 print(f"\n🎯 ВРЕМЯ ОТПРАВКИ НАСТУПИЛО! {current_time.strftime('%H:%M:%S')} UTC")
                 scheduled_job()
                 print(f"\n✅ Отправка завершена. Следующая - завтра в {dushanbe_hour:02d}:{dushanbe_minute:02d} Душанбе")
+                # Ждем 60 секунд чтобы не отправить дважды в одну минуту
+                time.sleep(60)
             
             time.sleep(1)
             
