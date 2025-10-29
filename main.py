@@ -64,13 +64,14 @@ def should_send_now():
     dushanbe_minute = config["SEND_MINUTE"]
     
     # Душанбе UTC+5, сервер UTC
-    # Если хотим 9:13 Душанбе, на сервере должно быть 4:13
+    # Конвертируем время Душанбе в UTC
     utc_hour = (dushanbe_hour - 5) % 24
     
     # Отладочная информация
     if current_time.second == 0:
-        print(f"🕐 Проверка времени: Сервер {current_time.hour:02d}:{current_time.minute:02d} | Нужно: {utc_hour:02d}:{dushanbe_minute:02d} UTC")
-        print(f"   Соответствует Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d} (UTC+5)")
+        dushanbe_current_hour = (current_time.hour + 5) % 24
+        print(f"🕐 Проверка времени: Сервер {current_time.hour:02d}:{current_time.minute:02d} | Душанбе {dushanbe_current_hour:02d}:{current_time.minute:02d}")
+        print(f"   Отправка запланирована на: Душанбе {dushanbe_hour:02d}:{dushanbe_minute:02d} (UTC {utc_hour:02d}:{dushanbe_minute:02d})")
     
     return (current_time.hour == utc_hour and 
             current_time.minute == dushanbe_minute and
@@ -147,12 +148,14 @@ def check_current_time():
     dushanbe_minute = config["SEND_MINUTE"]
     utc_hour = (dushanbe_hour - 5) % 24
     
+    dushanbe_current_hour = (current_time.hour + 5) % 24
+    
     print(f"\n🕐 ТЕКУЩЕЕ ВРЕМЯ:")
     print(f"   Сервер (UTC): {current_time.hour:02d}:{current_time.minute:02d}:{current_time.second:02d}")
-    print(f"   Душанбе (UTC+5): {(current_time.hour + 5) % 24:02d}:{current_time.minute:02d}")
+    print(f"   Душанбе (UTC+5): {dushanbe_current_hour:02d}:{current_time.minute:02d}")
     print(f"   Отправка запланирована на:")
     print(f"   - Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d}")
-    print(f"   - Сервер: {utc_hour:02d}:{dushanbe_minute:02d}")
+    print(f"   - Сервер: {utc_hour:02d}:{dushanbe_minute:02d} UTC")
 
 def main():
     print("🚀 Бот Умный Город запускается...")
@@ -172,7 +175,7 @@ def main():
     print(f"\n✅ Бот успешно запущен!")
     print(f"⏰ РАСПИСАНИЕ ОТПРАВКИ:")
     print(f"   📍 Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d} (UTC+5)")
-    print(f"   🌐 Сервер: {utc_hour:02d}:{dushanbe_minute:02d} (UTC)")
+    print(f"   🌐 Сервер: {utc_hour:02d}:{dushanbe_minute:02d} UTC")
     print(f"🔧 Статус бота: {'✅ ВКЛЮЧЕН' if config['BOT_ENABLED'] else '❌ ВЫКЛЮЧЕН'}")
     print(f"👥 Групп для рассылки: {len(config.get('GROUP_IDS', []))}")
     print("👑 Админ-панель активна!")
@@ -209,7 +212,8 @@ def main():
             # Логируем смену минуты
             if current_time.minute != last_minute:
                 last_minute = current_time.minute
-                print(f"🕐 Текущее время: {current_time.hour:02d}:{current_time.minute:02d} UTC (Душанбе: {(current_time.hour + 5) % 24:02d}:{current_time.minute:02d})")
+                dushanbe_hour = (current_time.hour + 5) % 24
+                print(f"🕐 Текущее время: {current_time.hour:02d}:{current_time.minute:02d} UTC (Душанбе: {dushanbe_hour:02d}:{current_time.minute:02d})")
             
             # Проверяем, нужно ли отправить ежедневный отчет
             if should_send_now():
