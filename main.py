@@ -67,14 +67,18 @@ def should_send_now():
     # Конвертируем время Душанбе в UTC
     utc_hour = (dushanbe_hour - 5) % 24
     
+    # Получаем текущее время Душанбе
+    current_dushanbe_hour = (current_time.hour + 5) % 24
+    current_dushanbe_minute = current_time.minute
+    
     # Отладочная информация
     if current_time.second == 0:
-        dushanbe_current_hour = (current_time.hour + 5) % 24
-        print(f"🕐 Проверка времени: Сервер {current_time.hour:02d}:{current_time.minute:02d} | Душанбе {dushanbe_current_hour:02d}:{current_time.minute:02d}")
+        print(f"🕐 Проверка времени: Сервер {current_time.hour:02d}:{current_time.minute:02d} | Душанбе {current_dushanbe_hour:02d}:{current_dushanbe_minute:02d}")
         print(f"   Отправка запланирована на: Душанбе {dushanbe_hour:02d}:{dushanbe_minute:02d} (UTC {utc_hour:02d}:{dushanbe_minute:02d})")
     
-    return (current_time.hour == utc_hour and 
-            current_time.minute == dushanbe_minute and
+    # Проверяем совпадает ли текущее время Душанбе с временем отправки
+    return (current_dushanbe_hour == dushanbe_hour and 
+            current_dushanbe_minute == dushanbe_minute and
             current_time.second == 0)
 
 def scheduled_job():
@@ -146,16 +150,14 @@ def check_current_time():
     config = load_config()
     dushanbe_hour = config["SEND_HOUR"]
     dushanbe_minute = config["SEND_MINUTE"]
-    utc_hour = (dushanbe_hour - 5) % 24
     
-    dushanbe_current_hour = (current_time.hour + 5) % 24
+    current_dushanbe_hour = (current_time.hour + 5) % 24
     
     print(f"\n🕐 ТЕКУЩЕЕ ВРЕМЯ:")
     print(f"   Сервер (UTC): {current_time.hour:02d}:{current_time.minute:02d}:{current_time.second:02d}")
-    print(f"   Душанбе (UTC+5): {dushanbe_current_hour:02d}:{current_time.minute:02d}")
+    print(f"   Душанбе (UTC+5): {current_dushanbe_hour:02d}:{current_time.minute:02d}")
     print(f"   Отправка запланирована на:")
     print(f"   - Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d}")
-    print(f"   - Сервер: {utc_hour:02d}:{dushanbe_minute:02d} UTC")
 
 def main():
     print("🚀 Бот Умный Город запускается...")
@@ -170,12 +172,10 @@ def main():
     
     dushanbe_hour = config["SEND_HOUR"]
     dushanbe_minute = config["SEND_MINUTE"]
-    utc_hour = (dushanbe_hour - 5) % 24
     
     print(f"\n✅ Бот успешно запущен!")
     print(f"⏰ РАСПИСАНИЕ ОТПРАВКИ:")
     print(f"   📍 Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d} (UTC+5)")
-    print(f"   🌐 Сервер: {utc_hour:02d}:{dushanbe_minute:02d} UTC")
     print(f"🔧 Статус бота: {'✅ ВКЛЮЧЕН' if config['BOT_ENABLED'] else '❌ ВЫКЛЮЧЕН'}")
     print(f"👥 Групп для рассылки: {len(config.get('GROUP_IDS', []))}")
     print("👑 Админ-панель активна!")
@@ -219,7 +219,7 @@ def main():
             if should_send_now():
                 print(f"\n🎯 ВРЕМЯ ОТПРАВКИ НАСТУПИЛО! {current_time.strftime('%H:%M:%S')} UTC")
                 scheduled_job()
-                print(f"\n✅ Отправка завершена. Следующая - завтра в {utc_hour:02d}:{dushanbe_minute:02d} UTC")
+                print(f"\n✅ Отправка завершена. Следующая - завтра в {dushanbe_hour:02d}:{dushanbe_minute:02d} Душанбе")
             
             time.sleep(1)
             
