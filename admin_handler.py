@@ -514,7 +514,15 @@ def check_admin_messages():
                     if "message" in update and "text" in update["message"]:
                         message_text = update["message"]["text"]
                         chat_id = update["message"]["chat"]["id"]
-                        process_admin_command(message_text, chat_id)
+                        
+                        # Проверяем, что это личное сообщение (не группа/канал)
+                        chat_type = update["message"]["chat"].get("type", "")
+                        
+                        # Обрабатываем только личные сообщения (private)
+                        if chat_type == "private":
+                            process_admin_command(message_text, chat_id)
+                        # Игнорируем сообщения из групп и каналов
+                
                 if data["result"]:
                     last_id = data["result"][-1]["update_id"]
                     requests.get(f"{url}?offset={last_id + 1}")
