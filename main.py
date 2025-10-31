@@ -7,8 +7,8 @@ from aiogram.filters import Command
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Токен бота (замените на ваш)
-API_TOKEN = 'YOUR_BOT_TOKEN'
+# Токен бота (ЗАМЕНИТЕ НА РЕАЛЬНЫЙ ТОКЕН!)
+API_TOKEN = 'ваш_реальный_токен_бота'
 
 # ID админа (замените на ваш реальный ID)
 ADMIN_ID = 123456789  # Здесь должен быть ваш цифровой ID в Telegram
