@@ -1,142 +1,231 @@
-import asyncio
-import logging
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
+import time
+import json
+import requests
+from datetime import datetime
+from history_events import get_tajikistan_history
+from weather_service import get_dushanbe_weather
+from admin_handler import check_admin_messages
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+TELEGRAM_BOT_TOKEN = "8404371791:AAG-uiZ7Oab4udWZsb5HgijR56dPMPBH9W0"
+STICKER_ID = "CAACAgIAAxkBAAEPnw5o-adhPImHgSmQpfa-yO9kVk1RxAACwwwAAsVEyEtvpOuf2LbHBDYE"
 
-# ========== НАСТРОЙКИ ==========
-# Токен бота от @BotFather
-API_TOKEN = '8404371791:AAG-uiZ7Oab4udWZsb5HgijR56dPMPBH9W0'
+def load_config():
+    with open('config.json', 'r') as f:
+        return json.load(f)
 
-# ID админа (ваш ID в Telegram)
-ADMIN_ID = 708267814  # Ваш ID: @bkh3044
-
-# Список ID групп
-GROUPS = [
-    -1003104338746,  # Группа: "Тест Группа"
-]
-# ===============================
-
-# Инициализация бота и диспетчера
-try:
-    bot = Bot(token=API_TOKEN)
-    dp = Dispatcher()
-    print("✅ Токен валидный, бот инициализирован")
-except Exception as e:
-    print(f"❌ Ошибка инициализации бота: {e}")
-    exit()
-
-# Функция для отправки уведомления админу при запуске
-async def on_startup():
+def send_sticker(group_id):
     try:
-        await bot.send_message(ADMIN_ID, "✅ Сервер бота запущен и работает!")
-        logger.info("Уведомление отправлено админу")
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendSticker"
+        data = {"chat_id": group_id, "sticker": STICKER_ID}
+        response = requests.post(url, data=data)
+        if response.status_code == 200:
+            print(f"✅ Стикер отправлен в группу {group_id}!")
+            return True
+        else:
+            print(f"❌ Ошибка отправки стикера в группу {group_id}: {response.text}")
+            return False
+    except Exception as e:
+        print(f"❌ Ошибка стикера: {e}")
+        return False
+
+def send_daily_report(group_id):
+    try:
+        history_text = get_tajikistan_history()
+        weather_text = get_dushanbe_weather()
         
-        # Логируем информацию о группах
-        for group_id in GROUPS:
-            try:
-                chat = await bot.get_chat(group_id)
-                group_name = chat.title or "Без названия"
-                logger.info(f"📋 Группа: {group_name} | 🆔 ID: {group_id}")
-            except Exception as e:
-                logger.error(f"Ошибка получения информации о группе {group_id}: {e}")
-                
-    except Exception as e:
-        logger.error(f"Ошибка отправки уведомления админу: {e}")
-
-# Функция для отправки уведомления админу при остановке
-async def on_shutdown():
-    try:
-        await bot.send_message(ADMIN_ID, "❌ Сервер бота остановлен!")
-        logger.info("Уведомление об остановке отправлено админу")
-    except Exception as e:
-        logger.error(f"Ошибка отправки уведомления об остановке: {e}")
-
-# Функция для получения информации о группе
-async def get_group_info(group_id: int) -> str:
-    try:
-        chat = await bot.get_chat(group_id)
-        group_name = chat.title or "Без названия"
-        group_type = "Группа" if chat.type == "group" else "Супергруппа" if chat.type == "supergroup" else "Канал"
-        members_count = await bot.get_chat_members_count(group_id)
+        message = f"📅 ЕЖЕДНЕВНАЯ СВОДКА\n\n"
+        message += history_text + "\n\n"
+        message += weather_text + "\n\n"
+        message += "🇹🇯 Государственное унитарное предприятие «Умный город»"
         
-        return f"📋 {group_name}\n🆔 ID: {group_id}\n👥 Тип: {group_type}\n👥 Участников: {members_count}"
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        data = {"chat_id": group_id, "text": message}
+        
+        response = requests.post(url, data=data)
+        
+        if response.status_code == 200:
+            print(f"✅ Сообщение отправлено в группу {group_id}! Время: {datetime.now().strftime('%H:%M:%S')}")
+            return True
+        else:
+            print(f"❌ Ошибка отправки в группу {group_id}: {response.text}")
+            return False
     except Exception as e:
-        return f"🆔 ID группы: {group_id}\n❌ Не удалось получить информацию: {e}"
+        print(f"❌ Ошибка формирования отчета: {e}")
+        return False
 
-# Обработчик команды /start
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    await message.answer("Привет! Я бот для умного города. Используй /help для списка команд.")
+def should_send_now():
+    """Проверяет, нужно ли отправлять сообщение сейчас"""
+    config = load_config()
+    if not config["BOT_ENABLED"]:
+        return False
+        
+    current_time = datetime.now()
+    dushanbe_hour = config["SEND_HOUR"]
+    dushanbe_minute = config["SEND_MINUTE"]
+    
+    # Душанбе UTC+5, сервер UTC
+    # Получаем текущее время Душанбе
+    current_dushanbe_hour = (current_time.hour + 5) % 24
+    current_dushanbe_minute = current_time.minute
+    
+    # Отладочная информация каждые 30 секунд
+    if current_time.second % 30 == 0:
+        print(f"🕐 Проверка времени: Душанбе {current_dushanbe_hour:02d}:{current_dushanbe_minute:02d} | Ожидаем: {dushanbe_hour:02d}:{dushanbe_minute:02d}")
+    
+    # Проверяем совпадает ли текущее время Душанбе с временем отправки
+    return (current_dushanbe_hour == dushanbe_hour and 
+            current_dushanbe_minute == dushanbe_minute)
 
-# Обработчик команды /help
-@dp.message(Command("help"))
-async def cmd_help(message: types.Message):
-    help_text = """
-Доступные команды:
-/start - Начать работу
-/help - Показать справку
-/worktime - Узнать время работы
-/contacts - Контакты администрации
-/groups - Информация о группах (только для админа)
-"""
-    await message.answer(help_text)
+def scheduled_job():
+    config = load_config()
+    if not config["BOT_ENABLED"]:
+        print("⏸️ Бот выключен в настройках")
+        return
+        
+    current_time = datetime.now().strftime('%H:%M:%S')
+    groups = config.get("GROUP_IDS", [])
+    
+    print(f"\n🎯 АВТОМАТИЧЕСКАЯ ОТПРАВКА в {current_time}")
+    print(f"📢 Отправка в {len(groups)} групп")
+    
+    success_count = 0
+    for group_id in groups:
+        if send_sticker(group_id):
+            time.sleep(2)
+            if send_daily_report(group_id):
+                success_count += 1
+        time.sleep(1)
+    
+    print(f"✅ Успешно отправлено в {success_count}/{len(groups)} групп")
 
-# Обработчик команды /worktime
-@dp.message(Command("worktime"))
-async def cmd_worktime(message: types.Message):
-    await message.answer("🕐 Время работы: 8:00 - 17:00")
+def test_bot_connection():
+    """Проверка соединения с Telegram"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"✅ Связь с Telegram API установлена")
+            print(f"🤖 Бот: {data['result']['first_name']} (@{data['result']['username']})")
+            return True
+        else:
+            print(f"❌ Ошибка связи с Telegram: {response.text}")
+            return False
+    except Exception as e:
+        print(f"❌ Ошибка подключения к Telegram: {e}")
+        return False
 
-# Обработчик команды /contacts
-@dp.message(Command("contacts"))
-async def cmd_contacts(message: types.Message):
-    contacts_text = """
-📞 Контакты администрации:
-
-📍 Адрес: г. Умный Город, ул. Центральная, 1
-📞 Телефон: +7 (999) 123-45-67
-📧 Email: admin@smartcity.gov
-🌐 Сайт: www.smartcity.gov
-"""
-    await message.answer(contacts_text)
-
-# Обработчик команды /groups (только для админа)
-@dp.message(Command("groups"))
-async def cmd_groups(message: types.Message):
-    # Проверяем, является ли пользователь админом
-    if message.from_user.id != ADMIN_ID:
-        await message.answer("❌ Эта команда доступна только администратору.")
+def force_send_test():
+    """Принудительная отправка для теста"""
+    print("\n" + "="*50)
+    print("🚨 ТЕСТОВАЯ ОТПРАВКА ПО КОМАНДЕ")
+    print("="*50)
+    
+    config = load_config()
+    groups = config.get("GROUP_IDS", [])
+    
+    if not groups:
+        print("❌ Нет групп для отправки")
         return
     
-    groups_info = "📊 **Информация о группах:**\n\n"
+    success_count = 0
+    for group_id in groups:
+        print(f"\n📤 Отправка в группу: {group_id}")
+        if send_sticker(group_id):
+            time.sleep(2)
+            if send_daily_report(group_id):
+                success_count += 1
+        time.sleep(1)
     
-    for i, group_id in enumerate(GROUPS, 1):
-        group_info = await get_group_info(group_id)
-        groups_info += f"{i}. {group_info}\n\n"
-    
-    await message.answer(groups_info, parse_mode="Markdown")
+    print(f"\n📊 Итог теста: успешно в {success_count}/{len(groups)} групп")
 
-# Обработчик текстовых сообщений
-@dp.message()
-async def echo_message(message: types.Message):
-    await message.answer("Извините, я не понимаю ваше сообщение. Используйте /help для списка команд.")
-
-# Основная функция
-async def main():
-    # Отправляем уведомление админу при запуске
-    await on_startup()
+def check_current_time():
+    """Проверка текущего времени"""
+    current_time = datetime.now()
+    config = load_config()
+    dushanbe_hour = config["SEND_HOUR"]
+    dushanbe_minute = config["SEND_MINUTE"]
     
-    # Запускаем бота
-    await dp.start_polling(bot)
+    current_dushanbe_hour = (current_time.hour + 5) % 24
+    
+    print(f"\n🕐 ТЕКУЩЕЕ ВРЕМЯ:")
+    print(f"   Сервер (UTC): {current_time.hour:02d}:{current_time.minute:02d}:{current_time.second:02d}")
+    print(f"   Душанбе (UTC+5): {current_dushanbe_hour:02d}:{current_time.minute:02d}")
+    print(f"   Отправка запланирована на:")
+    print(f"   - Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d}")
+
+def main():
+    print("🚀 Бот Умный Город запускается...")
+    print("="*50)
+    
+    # Проверка соединения с Telegram
+    if not test_bot_connection():
+        print("❌ Не удалось подключиться к Telegram. Проверьте токен бота.")
+        return
+    
+    config = load_config()
+    
+    dushanbe_hour = config["SEND_HOUR"]
+    dushanbe_minute = config["SEND_MINUTE"]
+    
+    print(f"\n✅ Бот успешно запущен!")
+    print(f"⏰ РАСПИСАНИЕ ОТПРАВКИ:")
+    print(f"   📍 Душанбе: {dushanbe_hour:02d}:{dushanbe_minute:02d} (UTC+5)")
+    print(f"🔧 Статус бота: {'✅ ВКЛЮЧЕН' if config['BOT_ENABLED'] else '❌ ВЫКЛЮЧЕН'}")
+    print(f"👥 Групп для рассылки: {len(config.get('GROUP_IDS', []))}")
+    print("👑 Админ-панель активна!")
+    
+    # Проверка текущего времени
+    check_current_time()
+    
+    if config["BOT_ENABLED"]:
+        print(f"\n🔄 Выполняю тестовую отправку...")
+        groups = config.get("GROUP_IDS", [])
+        success_count = 0
+        for group_id in groups:
+            print(f"\n📤 Тест в группу: {group_id}")
+            if send_sticker(group_id):
+                time.sleep(2)
+                if send_daily_report(group_id):
+                    success_count += 1
+            time.sleep(1)
+        print(f"\n✅ Тест завершен! Успешно: {success_count}/{len(groups)} групп")
+    
+    print(f"\n{'='*50}")
+    print("⏳ Ожидание времени для автоматической отправки...")
+    print("Для принудительной отправки напишите боту /test")
+    print("="*50)
+    
+    last_minute = -1
+    while True:
+        try:
+            current_time = datetime.now()
+            
+            # Проверяем сообщения админа каждую секунду
+            check_admin_messages()
+            
+            # Логируем смену минуты
+            if current_time.minute != last_minute:
+                last_minute = current_time.minute
+                current_dushanbe_hour = (current_time.hour + 5) % 24
+                print(f"🕐 Текущее время: {current_time.hour:02d}:{current_time.minute:02d} UTC (Душанбе: {current_dushanbe_hour:02d}:{current_time.minute:02d}) - Ожидаем: {dushanbe_hour:02d}:{dushanbe_minute:02d}")
+            
+            # Проверяем, нужно ли отправить ежедневный отчет
+            if should_send_now():
+                print(f"\n🎯 ВРЕМЯ ОТПРАВКИ НАСТУПИЛО! {current_time.strftime('%H:%M:%S')} UTC")
+                scheduled_job()
+                print(f"\n✅ Отправка завершена. Следующая - завтра в {dushanbe_hour:02d}:{dushanbe_minute:02d} Душанбе")
+                # Ждем 60 секунд чтобы не отправить дважды в одну минуту
+                time.sleep(60)
+            
+            time.sleep(1)
+            
+        except KeyboardInterrupt:
+            print("\n🛑 Бот остановлен пользователем")
+            break
+        except Exception as e:
+            print(f"❌ Критическая ошибка: {e}")
+            time.sleep(60)
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Бот остановлен")
-    finally:
-        # При остановке бота отправляем уведомление
-        asyncio.run(on_shutdown())
+    main()
