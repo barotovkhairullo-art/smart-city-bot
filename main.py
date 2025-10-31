@@ -1,11 +1,11 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Токен бота (замените на ваш)
 API_TOKEN = 'YOUR_BOT_TOKEN'
@@ -16,6 +16,37 @@ ADMIN_ID = 123456789  # Здесь должен быть ваш цифровой
 # Инициализация бота и диспетчера
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
+
+# Список групп (замените на реальные ID)
+GROUPS = [
+    -1002059376613,  # Ваша группа
+]
+
+# Функция для отправки уведомления админу при запуске
+async def on_startup():
+    try:
+        await bot.send_message(ADMIN_ID, "✅ Сервер бота запущен и работает!")
+        logger.info("Уведомление отправлено админу")
+        
+        # Логируем информацию о группах
+        for group_id in GROUPS:
+            try:
+                chat = await bot.get_chat(group_id)
+                group_name = chat.title or "Без названия"
+                logger.info(f"📋 Группа: {group_name} | 🆔 ID: {group_id}")
+            except Exception as e:
+                logger.error(f"Ошибка получения информации о группе {group_id}: {e}")
+                
+    except Exception as e:
+        logger.error(f"Ошибка отправки уведомления админу: {e}")
+
+# Функция для отправки уведомления админу при остановке
+async def on_shutdown():
+    try:
+        await bot.send_message(ADMIN_ID, "❌ Сервер бота остановлен!")
+        logger.info("Уведомление об остановке отправлено админу")
+    except Exception as e:
+        logger.error(f"Ошибка отправки уведомления об остановке: {e}")
 
 # Функция для получения информации о группе
 async def get_group_info(group_id: int) -> str:
@@ -28,22 +59,6 @@ async def get_group_info(group_id: int) -> str:
         return f"📋 {group_name}\n🆔 ID: {group_id}\n👥 Тип: {group_type}\n👥 Участников: {members_count}"
     except Exception as e:
         return f"🆔 ID группы: {group_id}\n❌ Не удалось получить информацию: {e}"
-
-# Функция для отправки уведомления админу при запуске
-async def on_startup():
-    try:
-        await bot.send_message(ADMIN_ID, "✅ Сервер бота запущен и работает!")
-        logging.info("Уведомление отправлено админу")
-    except Exception as e:
-        logging.error(f"Ошибка отправки уведомления админу: {e}")
-
-# Функция для отправки уведомления админу при остановке
-async def on_shutdown():
-    try:
-        await bot.send_message(ADMIN_ID, "❌ Сервер бота остановлен!")
-        logging.info("Уведомление об остановке отправлено админу")
-    except Exception as e:
-        logging.error(f"Ошибка отправки уведомления об остановке: {e}")
 
 # Обработчик команды /start
 @dp.message(Command("start"))
@@ -89,12 +104,9 @@ async def cmd_groups(message: types.Message):
         await message.answer("❌ Эта команда доступна только администратору.")
         return
     
-    # Здесь должны быть ID ваших групп (замените на реальные)
-    group_ids = [-1001234567890, -1009876543210]  # Пример ID групп
-    
     groups_info = "📊 **Информация о группах:**\n\n"
     
-    for i, group_id in enumerate(group_ids, 1):
+    for i, group_id in enumerate(GROUPS, 1):
         group_info = await get_group_info(group_id)
         groups_info += f"{i}. {group_info}\n\n"
     
@@ -112,12 +124,12 @@ async def main():
     
     # Запускаем бота
     await dp.start_polling(bot)
-    
-    # При остановке бота отправляем уведомление
-    await on_shutdown()
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("Бот остановлен")
+        logger.info("Бот остановлен")
+    finally:
+        # При остановке бота отправляем уведомление
+        asyncio.run(on_shutdown())
