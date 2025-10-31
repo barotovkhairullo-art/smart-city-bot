@@ -7,20 +7,27 @@ from aiogram.filters import Command
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Токен бота (ЗАМЕНИТЕ НА РЕАЛЬНЫЙ ТОКЕН!)
-API_TOKEN = 'ваш_реальный_токен_бота'
+# ========== НАСТРОЙКИ ==========
+# Токен бота от @BotFather
+API_TOKEN = '8404371791:AAG-uiZ7Oab4udWZsb5HgijR56dPMPBH9W0'
 
-# ID админа (замените на ваш реальный ID)
-ADMIN_ID = 123456789  # Здесь должен быть ваш цифровой ID в Telegram
+# ID админа (ваш ID в Telegram)
+ADMIN_ID = 708267814  # Ваш ID: @bkh3044
+
+# Список ID групп
+GROUPS = [
+    -1003104338746,  # Группа: "Тест Группа"
+]
+# ===============================
 
 # Инициализация бота и диспетчера
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
-
-# Список групп (замените на реальные ID)
-GROUPS = [
-    -1002059376613,  # Ваша группа
-]
+try:
+    bot = Bot(token=API_TOKEN)
+    dp = Dispatcher()
+    print("✅ Токен валидный, бот инициализирован")
+except Exception as e:
+    print(f"❌ Ошибка инициализации бота: {e}")
+    exit()
 
 # Функция для отправки уведомления админу при запуске
 async def on_startup():
